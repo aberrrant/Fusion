@@ -27,62 +27,60 @@ local parseError = require(Package.Logging.parseError)
 local doCleanup = require(Package.Memory.doCleanup)
 
 local SUB_OBJECT_META = {
-	__index = {
-		roamKeys = true,
-		roamValues = false,
-		invalidateInputKey = function(self): ()
-			-- do nothing
-		end,
-		invalidateInputValue = function(self): ()
-			self._inputValueState:set(self.inputValue)
-		end,
-		useOutputPair = function(self, use)
-			return self.inputKey, use(self._outputValueState)
-		end
-	}
+    __index = {
+        roamKeys = true,
+        roamValues = false,
+        invalidateInputKey = function(self): ()
+            -- do nothing
+        end,
+        invalidateInputValue = function(self): ()
+            self._inputValueState:set(self.inputValue)
+        end,
+        useOutputPair = function(self, use)
+            return self.inputKey, use(self._outputValueState)
+        end,
+    },
 }
 
 local function SubObject<K, VI, VO, S>(
-	scope: Types.Scope<S>,
-	initialKey: K,
-	initialValue: VI,
-	processor: (Types.Use, Types.Scope<S>, VI) -> VO
+    scope: Types.Scope<S>,
+    initialKey: K,
+    initialValue: VI,
+    processor: (Types.Use, Types.Scope<S>, VI) -> VO
 ): ForTypes.SubObject<S, K, K, VI, VO>
-	local self = {}
-	self.maybeScope = scope
-	self.inputKey = initialKey
-	self.inputValue = initialValue
-	self._inputValueState = Value(scope, initialValue)
-	self._processor = processor
-	self._outputValueState = Computed(scope, function(use, scope): VO?
-		local inputValue = use(self._inputValueState)
-		local ok, outputValue = xpcall(self._processor, parseError, use, scope, inputValue)
-		if ok then
-			return outputValue
-		else
-			local error: Types.Error = outputValue :: any
-			error.context = `while processing value {tostring(inputValue)}`
-			External.logErrorNonFatal("callbackError", error)
-			doCleanup(scope)
-			table.clear(scope)
-			return nil
-		end
-	end)
-	return setmetatable(self, SUB_OBJECT_META) :: any
+    local self = {}
+    self.maybeScope = scope
+    self.inputKey = initialKey
+    self.inputValue = initialValue
+    self._inputValueState = Value(scope, initialValue)
+    self._processor = processor
+    self._outputValueState = Computed(scope, function(use, scope): VO?
+        local inputValue = use(self._inputValueState)
+        local ok, outputValue = xpcall(function()
+            return self._processor(use, scope, inputValue)
+        end, parseError)
+        if ok then
+            return outputValue
+        else
+            local error: Types.Error = outputValue :: any
+            error.context = `while processing value {tostring(inputValue)}`
+            External.logErrorNonFatal("callbackError", error)
+            doCleanup(scope)
+            table.clear(scope)
+            return nil
+        end
+    end)
+    return setmetatable(self, SUB_OBJECT_META) :: any
 end
 
 local function ForValues<K, VI, VO, S>(
-	scope: Types.Scope<S>,
-	inputTable: Types.UsedAs<{[K]: VI}>,
-	processor: (Types.Use, Types.Scope<S>, VI) -> VO
+    scope: Types.Scope<S>,
+    inputTable: Types.UsedAs<{ [K]: VI }>,
+    processor: (Types.Use, Types.Scope<S>, VI) -> VO
 ): Types.For<K, VO>
-	return For(
-		scope,
-		inputTable,
-		function(scope, initialKey, initialValue)
-			return SubObject(scope, initialKey, initialValue, processor)
-		end
-	)
+    return (For :: any)(scope, inputTable, function(scope, initialKey, initialValue)
+        return SubObject(scope, initialKey, initialValue, processor)
+    end) :: Types.For<K, VO>
 end
 
 return ForValues :: Types.ForValuesConstructor

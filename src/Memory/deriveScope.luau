@@ -16,9 +16,15 @@ local ExternalDebug = require(Package.ExternalDebug)
 local deriveScopeImpl = require(Package.Memory.deriveScopeImpl)
 
 local function deriveScope(...)
-	local scope = deriveScopeImpl(...)
-	ExternalDebug.trackScope(scope)
-	return scope
+    -- Same reasoning as innerScope.luau: forwarding an untyped vararg pack
+    -- into deriveScopeImpl's overloaded generic type can't match any single
+    -- overload, so this call is narrowed to `any`.
+    local scope = (deriveScopeImpl :: any)(...)
+    ExternalDebug.trackScope(scope)
+    return scope
 end
 
-return deriveScope :: Types.DeriveScopeConstructor
+-- deriveScope's inferred type (forwarding untyped `...` into deriveScopeImpl)
+-- shares no structure with the overloaded generic constructor type below, so
+-- this has to go through `any` same as deriveScopeImpl's own last line does.
+return (deriveScope :: any) :: Types.DeriveScopeConstructor

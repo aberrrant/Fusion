@@ -23,18 +23,12 @@ local Debugger = {}
 	Swaps to a new debugger.
 	Returns the old debugger, so it can be used again later.
 ]]
-function Debugger.setDebugger(
-	newProvider: Types.ExternalDebugger?
-): Types.ExternalDebugger?
-	local oldProvider = currentProvider
-	if oldProvider ~= nil then
-		oldProvider.stopDebugging()
-	end
-	currentProvider = newProvider
-	if newProvider ~= nil then
-		newProvider.startDebugging()
-	end
-	return oldProvider
+function Debugger.setDebugger(newProvider: Types.ExternalDebugger?): Types.ExternalDebugger?
+    local oldProvider = currentProvider
+    if oldProvider ~= nil then oldProvider.stopDebugging() end
+    currentProvider = newProvider
+    if newProvider ~= nil then newProvider.startDebugging() end
+    return oldProvider
 end
 
 --[[
@@ -43,13 +37,9 @@ end
 	library, so that debuggers can register its existence and track changes
 	to the scope over time.
 ]]
-function Debugger.trackScope(
-	scope: Types.Scope<unknown>
-): ()
-	if currentProvider == nil then
-		return
-	end
-	currentProvider.trackScope(scope)
+function Debugger.trackScope(scope: Types.Scope<unknown>): ()
+    if currentProvider == nil then return end
+    currentProvider.trackScope(scope)
 end
 
 --[[
@@ -58,13 +48,9 @@ end
 	the scope from internal trackers. Note that, due to scope pooling and user
 	code, never assume that this correlates with garbage collection events.
 ]]
-function Debugger.untrackScope(
-	scope: Types.Scope<unknown>
-): ()
-	if currentProvider == nil then
-		return
-	end
-	currentProvider.trackScope(scope)
+function Debugger.untrackScope(scope: Types.Scope<unknown>): ()
+    if currentProvider == nil then return end
+    currentProvider.trackScope(scope)
 end
 
 return Debugger

@@ -21,7 +21,7 @@ local nicknames = require(Package.Utility.nicknames)
 local Disassembly = require(Package.State.For.Disassembly)
 
 type Self<S, KI, KO, VI, VO> = Types.For<KO, VO> & {
-	_disassembly: ForTypes.Disassembly<S, KI, KO, VI, VO>
+    _disassembly: ForTypes.Disassembly<S, KI, KO, VI, VO>,
 }
 
 local class = {}
@@ -29,72 +29,51 @@ class.type = "State"
 class.kind = "For"
 class.timeliness = "lazy"
 
-local METATABLE = table.freeze {__index = class}
+local METATABLE = table.freeze({ __index = class })
 
 local function For<S, KI, KO, VI, VO>(
-	scope: Types.Scope<S>,
-	inputTable: Types.UsedAs<{[KI]: VI}>,
-	constructor: (
-		Types.Scope<S>,
-		initialKey: KI,
-		initialValue: VI
-	) -> ForTypes.SubObject<S, KI, KO, VI, VO>
+    scope: Types.Scope<S>,
+    inputTable: Types.UsedAs<{ [KI]: VI }>,
+    constructor: (Types.Scope<S>, initialKey: KI, initialValue: VI) -> ForTypes.SubObject<S, KI, KO, VI, VO>
 ): Types.For<KO, VO>
-	local createdAt = os.clock()
-	local self: Self<S, KI, KO, VI, VO> = setmetatable(
-		{
-			createdAt = createdAt,
-			dependencySet = {},
-			dependentSet = {},
-			scope = scope,
-			validity = "invalid",
-			_EXTREMELY_DANGEROUS_usedAsValue = {},
-			_disassembly = Disassembly(
-				scope,
-				inputTable,
-				constructor
-			)
-		}, 
-		METATABLE
-	) :: any
+    local createdAt = os.clock()
+    local self: Self<S, KI, KO, VI, VO> = setmetatable({
+        createdAt = createdAt,
+        dependencySet = {},
+        dependentSet = {},
+        scope = scope,
+        validity = "invalid",
+        _EXTREMELY_DANGEROUS_usedAsValue = {},
+        _disassembly = (Disassembly :: any)(scope, inputTable, constructor) :: ForTypes.Disassembly<S, KI, KO, VI, KO>,
+    }, METATABLE) :: any
 
-	local destroy = function()
-		self.scope = nil
-		for dependency in pairs(self.dependencySet) do
-			dependency.dependentSet[self] = nil
-		end
-	end
-	self.oldestTask = destroy
-	nicknames[self.oldestTask] = "For"
-	table.insert(scope, destroy)
+    local destroy = function()
+        self.scope = nil
+        for dependency in pairs(self.dependencySet) do
+            dependency.dependentSet[self] = nil
+        end
+    end
+    self.oldestTask = destroy
+    nicknames[self.oldestTask] = "For"
+    table.insert(scope, destroy)
 
-	return self
+    return self
 end
 
-function class._evaluate<S, KI, KO, VI, VO>(
-	self: Self<S, KI, KO, VI, VO>
-): boolean
-	if self.scope == nil then
-		return false
-	end
-	local outerScope = self.scope :: S & Types.Scope<unknown>
+function class._evaluate<S, KI, KO, VI, VO>(self: Self<S, KI, KO, VI, VO>): boolean
+    if self.scope == nil then return false end
+    local outerScope = self.scope :: S & Types.Scope<unknown>
 
-	depend(self, self._disassembly)
-	table.clear(self._EXTREMELY_DANGEROUS_usedAsValue)
-	self._disassembly:populate(
-		function<T>(
-			maybeState: Types.UsedAs<T>
-		): T
-			local state = castToState(maybeState)
-			if state ~= nil then
-				depend(self, state)
-			end
-			return peek(maybeState)
-		end,
-		self._EXTREMELY_DANGEROUS_usedAsValue
-	)
+    depend(self, self._disassembly)
+    table.clear(self._EXTREMELY_DANGEROUS_usedAsValue)
+    local function use<T>(maybeState: T): Types.PeekedType<T>
+        local state = castToState(maybeState)
+        if state ~= nil then depend(self, state) end
+        return peek(maybeState)
+    end
+    self._disassembly:populate(use, self._EXTREMELY_DANGEROUS_usedAsValue)
 
-	return true
+    return true
 end
 
 table.freeze(class)

@@ -23,53 +23,42 @@ local class = {}
 class.type = "State"
 class.kind = "Value"
 class.timeliness = "lazy"
-class.dependencySet = table.freeze {}
+class.dependencySet = table.freeze({})
 
-local METATABLE = table.freeze {__index = class}
+local METATABLE = table.freeze({ __index = class })
 
-local function Value<T>(
-	scope: Types.Scope<unknown>,
-	initialValue: T
-): Types.Value<T, any>
-	local createdAt = os.clock()
-	local self: Self<T, any> = setmetatable(
-		{
-			createdAt = createdAt,
-			dependentSet = {},
-			lastChange = os.clock(),
-			scope = scope,
-			validity = "valid",
-			_EXTREMELY_DANGEROUS_usedAsValue = initialValue
-		}, 
-		METATABLE
-	) :: any
-	local destroy = function()
-		self.scope = nil
-	end
-	self.oldestTask = destroy
-	nicknames[self.oldestTask] = "Value"
-	table.insert(scope, destroy)
-	return self
+local function Value<T>(scope: Types.Scope<unknown>, initialValue: T): Types.Value<T, any>
+    local createdAt = os.clock()
+    local self: Self<T, any> = setmetatable({
+        createdAt = createdAt,
+        dependentSet = {},
+        lastChange = os.clock(),
+        scope = scope,
+        validity = "valid",
+        _EXTREMELY_DANGEROUS_usedAsValue = initialValue,
+    }, METATABLE) :: any
+    local destroy = function()
+        self.scope = nil
+    end
+    self.oldestTask = destroy
+    nicknames[self.oldestTask] = "Value"
+    table.insert(scope, destroy)
+    return self
 end
 
-function class.set<T, S>(
-	self: Self<T, S>,
-	newValue: S
-): S
-	local oldValue = self._EXTREMELY_DANGEROUS_usedAsValue
-	if not isSimilar(oldValue, newValue) then
-		self._EXTREMELY_DANGEROUS_usedAsValue = newValue :: any
-		change(self)
-	end
-	return newValue
+function class.set<T, S>(self: Self<T, S>, newValue: S): S
+    local oldValue = self._EXTREMELY_DANGEROUS_usedAsValue
+    if not isSimilar(oldValue, newValue) then
+        self._EXTREMELY_DANGEROUS_usedAsValue = newValue :: any
+        change(self)
+    end
+    return newValue
 end
 
-function class._evaluate<T, S>(
-	_self: Self<T, S>
-): boolean
-	-- The similarity test is done in advance when the value is set, so this
-	-- should be fine.
-	return true
+function class._evaluate<T, S>(_self: Self<T, S>): boolean
+    -- The similarity test is done in advance when the value is set, so this
+    -- should be fine.
+    return true
 end
 
 table.freeze(class)

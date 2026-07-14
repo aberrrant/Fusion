@@ -22,40 +22,31 @@ local keyCache: { [string]: Types.SpecialKey } = {}
 
 -- TODO: should this accept tagName: UsedAs<string>?
 local function Tag(tagName: string): Types.SpecialKey
-	local key = keyCache[tagName]
-	if key == nil then
-		key = {
-			type = "SpecialKey",
-			kind = "Tag",
-			stage = "self",
-			apply = function(self: Types.SpecialKey, scope: Types.Scope<unknown>, value: unknown, applyTo: Instance)
-				if castToState(value) then
-					local value = value :: Types.StateObject<unknown>
-					checkLifetime.bOutlivesA(
-						scope,
-						applyTo,
-						value.scope,
-						value.oldestTask,
-						checkLifetime.formatters.boundTag,
-						tagName
-					)
-					Observer(scope, value :: any):onBind(function()
-						if peek(value) == true then
-							applyTo:AddTag(tagName)
-						elseif applyTo:HasTag(tagName) then
-							applyTo:RemoveTag(tagName)
-						end
-					end)
-				else
-					if value == true then
-						applyTo:AddTag(tagName)
-					end
-				end
-			end,
-		}
-		keyCache[tagName] = key
-	end
-	return key
+    local key = keyCache[tagName]
+    if key == nil then
+        key = {
+            type = "SpecialKey",
+            kind = "Tag",
+            stage = "self",
+            apply = function(self: Types.SpecialKey, scope: Types.Scope<unknown>, value: unknown, applyTo: Instance)
+                if castToState(value) then
+                    local value = value :: Types.StateObject<unknown>
+                    checkLifetime.bOutlivesA(scope, applyTo, value.scope, value.oldestTask, checkLifetime.formatters.boundTag, tagName)
+                    Observer(scope, value :: any):onBind(function()
+                        if peek(value) == true then
+                            applyTo:AddTag(tagName)
+                        elseif applyTo:HasTag(tagName) then
+                            applyTo:RemoveTag(tagName)
+                        end
+                    end)
+                else
+                    if value == true then applyTo:AddTag(tagName) end
+                end
+            end,
+        }
+        keyCache[tagName] = key
+    end
+    return key
 end
 
 return Tag

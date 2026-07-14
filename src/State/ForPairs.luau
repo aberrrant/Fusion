@@ -27,65 +27,63 @@ local parseError = require(Package.Logging.parseError)
 local doCleanup = require(Package.Memory.doCleanup)
 
 local SUB_OBJECT_META = {
-	__index = {
-		roamKeys = false,
-		roamValues = false,
-		invalidateInputKey = function(self): ()
-			self._inputKeyState:set(self.inputKey)
-		end,
-		invalidateInputValue = function(self): ()
-			self._inputValueState:set(self.inputValue)
-		end,
-		useOutputPair = function(self, use)
-			local pair = use(self._outputPairState)
-			return pair.key, pair.value
-		end
-	}
+    __index = {
+        roamKeys = false,
+        roamValues = false,
+        invalidateInputKey = function(self): ()
+            self._inputKeyState:set(self.inputKey)
+        end,
+        invalidateInputValue = function(self): ()
+            self._inputValueState:set(self.inputValue)
+        end,
+        useOutputPair = function(self, use)
+            local pair = use(self._outputPairState)
+            return pair.key, pair.value
+        end,
+    },
 }
 
 local function SubObject<KI, KO, VI, VO, S>(
-	scope: Types.Scope<S>,
-	initialKey: KI,
-	initialValue: VI,
-	processor: (Types.Use, Types.Scope<S>, KI, VI) -> (KO, VO)
+    scope: Types.Scope<S>,
+    initialKey: KI,
+    initialValue: VI,
+    processor: (Types.Use, Types.Scope<S>, KI, VI) -> (KO, VO)
 ): ForTypes.SubObject<S, KI, KO, VI, VO>
-	local self = {}
-	self.maybeScope = scope
-	self.inputKey = initialKey
-	self.inputValue = initialValue
-	self._inputKeyState = Value(scope, initialKey)
-	self._inputValueState = Value(scope, initialValue)
-	self._processor = processor
-	self._outputPairState = Computed(scope, function(use, scope): {key: KO?, value: VO?}
-		local inputKey = use(self._inputKeyState)
-		local inputValue = use(self._inputValueState)
-		local ok, outputKey, outputValue = xpcall(self._processor, parseError, use, scope, inputKey, inputValue)
-		if ok then
-			return {key = outputKey, value = outputValue}
-		else
-			local error: Types.Error = outputKey :: any
-			error.context = `while processing key {tostring(inputKey)} and value {tostring(inputValue)}`
-			External.logErrorNonFatal("callbackError", error)
-			doCleanup(scope)
-			table.clear(scope)
-			return {key = nil, value = nil}
-		end
-	end)
-	return setmetatable(self, SUB_OBJECT_META) :: any
+    local self = {}
+    self.maybeScope = scope
+    self.inputKey = initialKey
+    self.inputValue = initialValue
+    self._inputKeyState = Value(scope, initialKey)
+    self._inputValueState = Value(scope, initialValue)
+    self._processor = processor
+    self._outputPairState = Computed(scope, function(use, scope): { key: KO?, value: VO? }
+        local inputKey = use(self._inputKeyState)
+        local inputValue = use(self._inputValueState)
+        local ok, outputKey, outputValue = xpcall(function()
+            return self._processor(use, scope, inputKey, inputValue)
+        end, parseError)
+        if ok then
+            return { key = outputKey, value = outputValue }
+        else
+            local error: Types.Error = outputKey :: any
+            error.context = `while processing key {tostring(inputKey)} and value {tostring(inputValue)}`
+            External.logErrorNonFatal("callbackError", error)
+            doCleanup(scope)
+            table.clear(scope)
+            return { key = nil, value = nil }
+        end
+    end)
+    return setmetatable(self, SUB_OBJECT_META) :: any
 end
 
 local function ForPairs<KI, KO, VI, VO, S>(
-	scope: Types.Scope<S>,
-	inputTable: Types.UsedAs<{[KI]: VI}>,
-	processor: (Types.Use, Types.Scope<S>, KI, VI) -> (KO, VO)
+    scope: Types.Scope<S>,
+    inputTable: Types.UsedAs<{ [KI]: VI }>,
+    processor: (Types.Use, Types.Scope<S>, KI, VI) -> (KO, VO)
 ): Types.For<KO, VO>
-	return For(
-		scope,
-		inputTable,
-		function(scope, initialKey, initialValue)
-			return SubObject(scope, initialKey, initialValue, processor)
-		end
-	)
+    return (For :: any)(scope, inputTable, function(scope, initialKey, initialValue)
+        return SubObject(scope, initialKey, initialValue, processor)
+    end) :: Types.For<KO, VO>
 end
 
 return ForPairs :: Types.ForPairsConstructor

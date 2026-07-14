@@ -22,89 +22,75 @@ local evaluate = require(Package.Graph.evaluate)
 local nicknames = require(Package.Utility.nicknames)
 
 type Self = Types.Observer & {
-	_watchingGraph: Types.GraphObject?,
-	_changeListeners: {[unknown]: () -> ()}
+    _watchingGraph: Types.GraphObject?,
+    _changeListeners: { [unknown]: () -> () },
 }
 
 local class = {}
 class.type = "Observer"
 class.timeliness = "eager"
-class.dependentSet = table.freeze {}
+class.dependentSet = table.freeze({})
 
-local METATABLE = table.freeze {__index = class}
+local METATABLE = table.freeze({ __index = class })
 
-local function Observer(
-	scope: Types.Scope<unknown>,
-	watching: unknown
-): Types.Observer
-	local createdAt = os.clock()
+local function Observer(scope: Types.Scope<unknown>, watching: unknown): Types.Observer
+    local createdAt = os.clock()
 
-	local self: Self = setmetatable(
-		{
-			scope = scope,
-			createdAt = createdAt,
-			dependencySet = {},
-			lastChange = nil,
-			validity = "invalid",
-			_watchingGraph = castToGraph(watching),
-			_changeListeners = {}
-		},
-		METATABLE
-	) :: any
-	local destroy = function()
-		self.scope = nil
-		for dependency in pairs(self.dependencySet) do
-			dependency.dependentSet[self] = nil
-		end
-	end
-	self.oldestTask = destroy
-	nicknames[self.oldestTask] = "Observer"
-	table.insert(scope, destroy)
+    local self: Self = setmetatable({
+        scope = scope,
+        createdAt = createdAt,
+        dependencySet = {},
+        lastChange = nil,
+        validity = "invalid",
+        _watchingGraph = castToGraph(watching),
+        _changeListeners = {},
+    }, METATABLE) :: any
+    local destroy = function()
+        self.scope = nil
+        for dependency in pairs(self.dependencySet) do
+            dependency.dependentSet[self] = nil
+        end
+    end
+    self.oldestTask = destroy
+    nicknames[self.oldestTask] = "Observer"
+    table.insert(scope, destroy)
 
-	if self._watchingGraph ~= nil then
-		checkLifetime.bOutlivesA(
-			scope, self.oldestTask,
-			self._watchingGraph.scope, self._watchingGraph.oldestTask,
-			checkLifetime.formatters.observer
-		)
-	end
+    if self._watchingGraph ~= nil then
+        checkLifetime.bOutlivesA(
+            scope,
+            self.oldestTask,
+            self._watchingGraph.scope,
+            self._watchingGraph.oldestTask,
+            checkLifetime.formatters.observer
+        )
+    end
 
-	-- Eagerly evaluated objects need to evaluate themselves so that they're
-	-- valid at all times.
-	evaluate(self, true)
+    -- Eagerly evaluated objects need to evaluate themselves so that they're
+    -- valid at all times.
+    evaluate(self, true)
 
-	return self
+    return self
 end
 
-function class.onBind(
-	self: Self,
-	callback: () -> ()
-): () -> ()
-	External.doTaskImmediate(callback)
-	return self:onChange(callback)
+function class.onBind(self: Self, callback: () -> ()): () -> ()
+    External.doTaskImmediate(callback)
+    return self:onChange(callback)
 end
 
-function class.onChange(
-	self: Self,
-	callback: () -> ()
-): () -> ()
-	local uniqueIdentifier = table.freeze {}
-	self._changeListeners[uniqueIdentifier] = callback
-	return function()
-		self._changeListeners[uniqueIdentifier] = nil
-	end
+function class.onChange(self: Self, callback: () -> ()): () -> ()
+    local uniqueIdentifier = table.freeze({})
+    self._changeListeners[uniqueIdentifier] = callback
+    return function()
+        self._changeListeners[uniqueIdentifier] = nil
+    end
 end
 
-function class._evaluate(
-	self: Self
-): ()
-	if self._watchingGraph ~= nil then
-		depend(self, self._watchingGraph)
-	end
-	for _, callback in self._changeListeners do
-		External.doTaskImmediate(callback)
-	end
-	return true
+function class._evaluate(self: Self): boolean
+    if self._watchingGraph ~= nil then depend(self, self._watchingGraph) end
+    for _, callback in self._changeListeners do
+        External.doTaskImmediate(callback)
+    end
+    return true
 end
 
 table.freeze(class)

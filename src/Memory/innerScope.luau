@@ -12,23 +12,19 @@ local Types = require(Package.Types)
 local ExternalDebug = require(Package.ExternalDebug)
 local deriveScopeImpl = require(Package.Memory.deriveScopeImpl)
 
-local function innerScope<T>(
-	existing: Types.Scope<T>,
-	...: {[unknown]: unknown}
-): any
-	local new = deriveScopeImpl(existing, ...)
-	table.insert(existing, new)
-	table.insert(
-		new, 
-		function()
-			local index = table.find(existing, new)
-			if index ~= nil then
-				table.remove(existing, index)
-			end
-		end
-	)
-	ExternalDebug.trackScope(new)
-	return new
+local function innerScope<T>(existing: Types.Scope<T>, ...: { [unknown]: unknown }): any
+    -- deriveScopeImpl's public type is an overloaded generic constructor (see
+    -- its own file); forwarding an untyped vararg pack into it can't be
+    -- proven to match any single overload, so this call is narrowed to `any`
+    -- the same way deriveScopeImpl's own last line narrows its return.
+    local new = (deriveScopeImpl :: any)(existing, ...)
+    table.insert(existing, new)
+    table.insert(new, function()
+        local index = table.find(existing, new)
+        if index ~= nil then table.remove(existing, index) end
+    end)
+    ExternalDebug.trackScope(new)
+    return new
 end
 
 return (innerScope :: any) :: Types.DeriveScopeConstructor

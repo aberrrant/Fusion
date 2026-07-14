@@ -16,9 +16,7 @@ local sRGB = {}
 -- Equivalent to f_inv. Takes a linear sRGB channel and returns
 -- the sRGB channel
 local function transform(channel: number): number
-    if channel < 0.04045 then
-        return channel / 12.92
-    end
+    if channel < 0.04045 then return channel / 12.92 end
 
     return ((channel + 0.055) / 1.055) ^ 2.4
 end
@@ -26,9 +24,7 @@ end
 -- Equivalent to f. Takes an sRGB channel and returns
 -- the linear sRGB channel
 local function inverse(channel: number): number
-    if channel < 0.0031308 then
-        return 12.92 * channel
-    end
+    if channel < 0.0031308 then return 12.92 * channel end
 
     return (1.055 * channel ^ (1 / 2.4)) - 0.055
 end

@@ -12,10 +12,8 @@ local task = nil -- Disable usage of Roblox's task scheduler
 local Package = script.Parent.Parent
 local Types = require(Package.Types)
 
-local function Child(
-	x: {Types.Child}
-): Types.Child
-	return x
+local function Child(x: { Types.Child }): Types.Child
+    return (x :: any) :: Types.Child
 end
 
 return Child

@@ -12,13 +12,11 @@ local Types = require(Package.Types)
 local ExternalDebug = require(Package.ExternalDebug)
 local merge = require(Package.Utility.merge)
 
-local function scoped(
-	...: {[unknown]: unknown}
-): any
-	local metatable = {__index = merge(false, {}, ...)}
-	local scope = setmetatable({}, metatable) :: any
-	ExternalDebug.trackScope(scope)
-	return scope
+local function scoped(...: { [unknown]: unknown }): any
+    local metatable = { __index = merge(false, {}, ...) }
+    local scope = setmetatable({}, metatable) :: any
+    ExternalDebug.trackScope(scope)
+    return scope
 end
 
 return (scoped :: any) :: Types.ScopedConstructor

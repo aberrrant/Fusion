@@ -27,62 +27,60 @@ local ForTypes = require(Package.State.For.ForTypes)
 local parseError = require(Package.Logging.parseError)
 
 local SUB_OBJECT_META = {
-	__index = {
-		roamKeys = false,
-		roamValues = true,
-		invalidateInputKey = function(self): ()
-			self._inputKeyState:set(self.inputKey)
-		end,
-		invalidateInputValue = function(self): ()
-			-- do nothing
-		end,
-		useOutputPair = function(self, use)
-			return use(self._outputKeyState), self.inputValue
-		end
-	}
+    __index = {
+        roamKeys = false,
+        roamValues = true,
+        invalidateInputKey = function(self): ()
+            self._inputKeyState:set(self.inputKey)
+        end,
+        invalidateInputValue = function(self): ()
+            -- do nothing
+        end,
+        useOutputPair = function(self, use)
+            return use(self._outputKeyState), self.inputValue
+        end,
+    },
 }
 
 local function SubObject<KI, KO, V, S>(
-	scope: Types.Scope<S>,
-	initialKey: KI,
-	initialValue: V,
-	processor: (Types.Use, Types.Scope<S>, KI) -> KO
+    scope: Types.Scope<S>,
+    initialKey: KI,
+    initialValue: V,
+    processor: (Types.Use, Types.Scope<S>, KI) -> KO
 ): ForTypes.SubObject<S, KI, KO, V, V>
-	local self = {}
-	self.maybeScope = scope
-	self.inputKey = initialKey
-	self.inputValue = initialValue
-	self._inputKeyState = Value(scope, initialKey)
-	self._processor = processor
-	self._outputKeyState = Computed(scope, function(use, scope): KO?
-		local inputKey = use(self._inputKeyState)
-		local ok, outputKey = xpcall(self._processor, parseError, use, scope, inputKey)
-		if ok then
-			return outputKey
-		else
-			local error: Types.Error = outputKey :: any
-			error.context = `while processing key {tostring(inputKey)}`
-			External.logErrorNonFatal("callbackError", error)
-			doCleanup(scope)
-			table.clear(scope)
-			return nil
-		end
-	end)
-	return setmetatable(self, SUB_OBJECT_META) :: any
+    local self = {}
+    self.maybeScope = scope
+    self.inputKey = initialKey
+    self.inputValue = initialValue
+    self._inputKeyState = Value(scope, initialKey)
+    self._processor = processor
+    self._outputKeyState = Computed(scope, function(use, scope): KO?
+        local inputKey = use(self._inputKeyState)
+        local ok, outputKey = xpcall(function()
+            return self._processor(use, scope, inputKey)
+        end, parseError)
+        if ok then
+            return outputKey
+        else
+            local error: Types.Error = outputKey :: any
+            error.context = `while processing key {tostring(inputKey)}`
+            External.logErrorNonFatal("callbackError", error)
+            doCleanup(scope)
+            table.clear(scope)
+            return nil
+        end
+    end)
+    return setmetatable(self, SUB_OBJECT_META) :: any
 end
 
 local function ForKeys<KI, KO, V, S>(
-	scope: Types.Scope<S>,
-	inputTable: Types.UsedAs<{[KI]: V}>,
-	processor: (Types.Use, Types.Scope<S>, KI) -> KO
+    scope: Types.Scope<S>,
+    inputTable: Types.UsedAs<{ [KI]: V }>,
+    processor: (Types.Use, Types.Scope<S>, KI) -> KO
 ): Types.For<KO, V>
-	return For(
-		scope, 
-		inputTable, 
-		function(scope, initialKey, initialValue)
-			return SubObject(scope, initialKey, initialValue, processor)
-		end
-	)
+    return (For :: any)(scope, inputTable, function(scope, initialKey, initialValue)
+        return SubObject(scope, initialKey, initialValue, processor)
+    end) :: Types.For<KO, V>
 end
 
 return ForKeys :: Types.ForKeysConstructor

@@ -1,5 +1,3 @@
-
-
 --!strict
 --!nolint LocalUnused
 --!nolint LocalShadow
@@ -18,117 +16,79 @@ local checkLifetime = {}
 
 checkLifetime.formatters = {}
 
-function checkLifetime.formatters.useFunction(
-	self: unknown,
-	used: unknown
-): (string, string)
-	local selfName = nameOf(self, "object")
-	local usedName = nameOf(used, "object")
-	return `The use()-d {usedName}`, `the {selfName}`
-end
-	
-function checkLifetime.formatters.boundProperty(
-	instance: Instance,
-	bound: unknown,
-	property: string
-): (string, string)
-	local selfName = instance.Name
-	local boundName = nameOf(bound, "value")
-	return `The {boundName} (bound to the {property} property)`, `the {selfName} instance`
+function checkLifetime.formatters.useFunction(self: unknown, used: unknown): (string, string)
+    local selfName = nameOf(self, "object")
+    local usedName = nameOf(used, "object")
+    return `The use()-d {usedName}`, `the {selfName}`
 end
 
-function checkLifetime.formatters.boundAttribute(
-	instance: Instance,
-	bound: unknown,
-	attribute: string
-): (string, string)
-	local selfName = instance.Name
-	local boundName = nameOf(bound, "value")
-	return `The {boundName} (bound to the {attribute} attribute)`, `the {selfName} instance`
+function checkLifetime.formatters.boundProperty(instance: Instance, bound: unknown, property: string): (string, string)
+    local selfName = instance.Name
+    local boundName = nameOf(bound, "value")
+    return `The {boundName} (bound to the {property} property)`, `the {selfName} instance`
 end
 
-function checkLifetime.formatters.boundTag(
-	instance: Instance,
-	bound: unknown,
-	tag: string
-): (string, string)
-	local selfName = instance.Name
-	local boundName = nameOf(bound, "value")
-	return `The {boundName} (bound to the {tag} CollectionService tag)`, `the {selfName} instance`
+function checkLifetime.formatters.boundAttribute(instance: Instance, bound: unknown, attribute: string): (string, string)
+    local selfName = instance.Name
+    local boundName = nameOf(bound, "value")
+    return `The {boundName} (bound to the {attribute} attribute)`, `the {selfName} instance`
 end
 
-function checkLifetime.formatters.propertyOutputsTo(
-	instance: Instance,
-	bound: unknown,
-	property: string
-): (string, string)
-	local selfName = instance.Name
-	local boundName = nameOf(bound, "object")
-	return `The {boundName} (which the {property} property outputs to)`, `the {selfName} instance`
+function checkLifetime.formatters.boundTag(instance: Instance, bound: unknown, tag: string): (string, string)
+    local selfName = instance.Name
+    local boundName = nameOf(bound, "value")
+    return `The {boundName} (bound to the {tag} CollectionService tag)`, `the {selfName} instance`
 end
 
-function checkLifetime.formatters.attributeOutputsTo(
-	instance: Instance,
-	bound: unknown,
-	attribute: string
-): (string, string)
-	local selfName = instance.Name
-	local boundName = nameOf(bound, "object")
-	return `The {boundName} (which the {attribute} attribute outputs to)`, `the {selfName} instance`
+function checkLifetime.formatters.propertyOutputsTo(instance: Instance, bound: unknown, property: string): (string, string)
+    local selfName = instance.Name
+    local boundName = nameOf(bound, "object")
+    return `The {boundName} (which the {property} property outputs to)`, `the {selfName} instance`
 end
 
-function checkLifetime.formatters.refOutputsTo(
-	instance: Instance,
-	bound: unknown
-): (string, string)
-	local selfName = instance.Name
-	local boundName = nameOf(bound, "object")
-	return `The {boundName} (which the Ref key outputs to)`, `the {selfName} instance`
+function checkLifetime.formatters.attributeOutputsTo(instance: Instance, bound: unknown, attribute: string): (string, string)
+    local selfName = instance.Name
+    local boundName = nameOf(bound, "object")
+    return `The {boundName} (which the {attribute} attribute outputs to)`, `the {selfName} instance`
 end
 
-function checkLifetime.formatters.animationGoal(
-	self: unknown,
-	goal: unknown
-): (string, string)
-	local selfName = nameOf(self, "object")
-	local goalName = nameOf(goal, "object")
-	return `The goal {goalName}`, `the {selfName} that is following it`
+function checkLifetime.formatters.refOutputsTo(instance: Instance, bound: unknown): (string, string)
+    local selfName = instance.Name
+    local boundName = nameOf(bound, "object")
+    return `The {boundName} (which the Ref key outputs to)`, `the {selfName} instance`
 end
 
-function checkLifetime.formatters.parameter(
-	self: unknown,
-	used: unknown,
-	parameterName: string | false
-): (string, string)
-	local selfName = nameOf(self, "object")
-	local usedName = nameOf(used, "object")
-	if parameterName == false then
-		return `The {usedName} parameter`, `the {selfName} that it was used for`
-	else
-		return `The {usedName} representing the {parameterName} parameter`, `the {selfName} that it was used for`
-	end
+function checkLifetime.formatters.animationGoal(self: unknown, goal: unknown): (string, string)
+    local selfName = nameOf(self, "object")
+    local goalName = nameOf(goal, "object")
+    return `The goal {goalName}`, `the {selfName} that is following it`
 end
 
-function checkLifetime.formatters.observer(
-	self: unknown,
-	watched: unknown
-): (string, string)
-	local selfName = nameOf(self, "object")
-	local watchedName = nameOf(watched, "object")
-	return `The watched {watchedName}`, `the {selfName} that's observing it for changes`
+function checkLifetime.formatters.parameter(self: unknown, used: unknown, parameterName: string | false): (string, string)
+    local selfName = nameOf(self, "object")
+    local usedName = nameOf(used, "object")
+    if parameterName == false then
+        return `The {usedName} parameter`, `the {selfName} that it was used for`
+    else
+        return `The {usedName} representing the {parameterName} parameter`, `the {selfName} that it was used for`
+    end
+end
+
+function checkLifetime.formatters.observer(self: unknown, watched: unknown): (string, string)
+    local selfName = nameOf(self, "object")
+    local watchedName = nameOf(watched, "object")
+    return `The watched {watchedName}`, `the {selfName} that's observing it for changes`
 end
 
 function checkLifetime.bOutlivesA<A, B, Args...>(
-	scopeA: Types.Scope<unknown>,
-	a: A,
-	scopeB: Types.Scope<unknown>?,
-	b: B,
-	formatter: (a: A, b: B, Args...) -> (string, string),
-	...: Args...
+    scopeA: Types.Scope<unknown>,
+    a: A,
+    scopeB: Types.Scope<unknown>?,
+    b: B,
+    formatter: (a: A, b: B, Args...) -> (string, string),
+    ...: Args...
 )
-	if scopeB == nil then
-		External.logError("useAfterDestroy", nil, formatter(a, b, ...))
-	end
+    if scopeB == nil then External.logError("useAfterDestroy", nil, formatter(a, b, ...)) end
 end
 
 return checkLifetime

@@ -16,25 +16,17 @@ local merge = require(Package.Utility.merge)
 
 -- This return type is technically a lie, but it's required for useful type
 -- checking behaviour.
-local function deriveScopeImpl<T>(
-	existing: Types.Scope<T>,
-	methods: {[unknown]: unknown}?,
-	...: {[unknown]: unknown}
-): any
-	local metatable = getmetatable(existing)
-	if methods ~= nil then
-		metatable = table.clone(metatable)
-		metatable.__index = merge(
-			true, {}, 
-			metatable.__index, 
-			merge(
-				false, {},
-				methods, 
-				...
-			)
-		)
-	end
-	return setmetatable({}, metatable)
+local function deriveScopeImpl<T>(existing: Types.Scope<T>, methods: { [unknown]: unknown }?, ...: { [unknown]: unknown }): any
+    -- `existing` is `{ Task } & T` for generic T -- getmetatable's builtin
+    -- overloads can't be proven to accept an arbitrary intersection, so this
+    -- narrows to `any` for just this call rather than losing type safety on
+    -- the parameter itself.
+    local metatable = getmetatable(existing :: any)
+    if methods ~= nil then
+        metatable = table.clone(metatable)
+        metatable.__index = merge(true, {}, metatable.__index, merge(false, {}, methods, ...))
+    end
+    return setmetatable({}, metatable)
 end
 
 return (deriveScopeImpl :: any) :: Types.DeriveScopeConstructor

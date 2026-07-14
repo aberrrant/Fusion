@@ -20,62 +20,59 @@ local evaluate = require(Package.Graph.evaluate)
 -- cycle and error out?
 local TERMINATION_TIME = 1
 
-local function change(
-	target: Types.GraphObject
-): ()
-	if target.validity == "busy" then
-		return External.logError("infiniteLoop")
-	end
+local function change(target: Types.GraphObject): ()
+    if target.validity == "busy" then
+        External.logError("infiniteLoop")
+        return
+    end
 
-	local meaningfullyChanged = evaluate(target, true)
-	if not meaningfullyChanged then
-		return
-	end
+    local meaningfullyChanged = evaluate(target, true)
+    if not meaningfullyChanged then return end
 
-	local searchInNow: {Types.GraphObject} = {}
-	local searchInNext: {Types.GraphObject} = {}
-	local invalidateList: {Types.GraphObject} = {}
+    local searchInNow: { Types.GraphObject } = {}
+    local searchInNext: { Types.GraphObject } = {}
+    local invalidateList: { Types.GraphObject } = {}
 
-	searchInNow[1] = target
-	local terminateBy = os.clock() + TERMINATION_TIME * External.safetyTimerMultiplier
-	repeat
-		if os.clock() > terminateBy then
-			return External.logError("infiniteLoop")
-		end
-		local done = true
-		for _, searchTarget in searchInNow do
-			for dependent in searchTarget.dependentSet do
-				if dependent.validity == "valid" then
-					done = false
-					table.insert(invalidateList, dependent)
-					table.insert(searchInNext, dependent)
-				elseif dependent.validity == "busy" then
-					return External.logError("infiniteLoop")
-				end
-			end
-		end
-		searchInNow, searchInNext = searchInNext, searchInNow
-		table.clear(searchInNext)
-	until done
+    searchInNow[1] = target
+    local terminateBy = os.clock() + TERMINATION_TIME * External.safetyTimerMultiplier
+    repeat
+        if os.clock() > terminateBy then
+            External.logError("infiniteLoop")
+            return
+        end
+        local done = true
+        for _, searchTarget in searchInNow do
+            for dependent in searchTarget.dependentSet do
+                if dependent.validity == "valid" then
+                    done = false
+                    table.insert(invalidateList, dependent)
+                    table.insert(searchInNext, dependent)
+                elseif dependent.validity == "busy" then
+                    External.logError("infiniteLoop")
+                    return
+                end
+            end
+        end
+        searchInNow, searchInNext = searchInNext, searchInNow
+        table.clear(searchInNext)
+    until done
 
-	local eagerList: {Types.GraphObject} = {}
+    local eagerList: { Types.GraphObject } = {}
 
-	for _, invalidateTarget in invalidateList do
-		invalidateTarget.validity = "invalid"
-		if invalidateTarget.timeliness == "eager" then
-			table.insert(eagerList, invalidateTarget)
-		end
-	end
-	-- If objects are not executed in order of creations, then dynamic graphs
-	-- may experience 'glitches' where nested graph objects see intermediate
-	-- values before being destroyed.
-	-- https://fluff.blog/2024/07/14/glitches-in-dynamic-reactive-graphs.html
-	table.sort(eagerList, function(a, b)
-		return a.createdAt < b.createdAt
-	end)
-	for _, eagerTarget in eagerList do
-		evaluate(eagerTarget, false)
-	end
+    for _, invalidateTarget in invalidateList do
+        invalidateTarget.validity = "invalid"
+        if invalidateTarget.timeliness == "eager" then table.insert(eagerList, invalidateTarget) end
+    end
+    -- If objects are not executed in order of creations, then dynamic graphs
+    -- may experience 'glitches' where nested graph objects see intermediate
+    -- values before being destroyed.
+    -- https://fluff.blog/2024/07/14/glitches-in-dynamic-reactive-graphs.html
+    table.sort(eagerList, function(a: Types.GraphObject, b: Types.GraphObject)
+        return a.createdAt < b.createdAt
+    end)
+    for _, eagerTarget in eagerList do
+        evaluate(eagerTarget, false)
+    end
 end
 
 return change
